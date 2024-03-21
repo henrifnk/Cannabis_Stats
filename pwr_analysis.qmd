@@ -1,0 +1,145 @@
+---
+title: "Power Analysis Canabis"
+---
+
+## Prerequisites
+
+```{r setup, include=FALSE}
+rm(list = ls())
+library(ordinal)
+library(parallel)
+library(data.table)
+library(ggplot2)
+source("helpers.R")
+eval = FALSE
+set.seed(123L)
+```
+
+Conduct an analysis to determine the power of the study to detect a significant effect of the `treatment` and `setup` on the outcome.
+The study is a repeated measures design between `n=10` and `n=2500` persons.
+The repeated measures are `rep_measures=10` per person.
+The alpha significance level is set to $\alpha = 0.05$.
+For each sample size, we conduct `sims=100` simulations.
+
+```{r settings}
+possible_pers <- c(10, seq(from=50, to=1e3, by=50), 1250, 1500, 2e3, 2.5e3, 3e3)
+rep_measures <- 10
+alpha <- 0.01     
+sims <- 200 
+```
+
+## Simulate Data
+
+We simulate the data for each sample size and store the results in a list of matrices.
+
+- $x_{age} \sim Unif(18, 65)$
+- $x_{education} \sim \mathcal{U}\{"High\_School", "Some\_College", "Other\_College"\}$
+- $x_{gender} \sim \mathcal{U}\{"male", "female"\}$
+- $x_{treatment} \sim \mathcal{U}\{0, 1\}$
+
+and the mixed effects:
+
+$\gamma_j \sim N(\mu_j, 0.5)$ where the person effect $\mu_j,\ j \in 1, \ldots, 10$ are in the interval $[-3, 3]$.
+
+We conduct power analysis for an alpha level of 0.05, a treatment effect of 0.5 and setup effects compared to "Canabis" of -1, 1.5, 2.5, 3.5.
+We try to reflect a reasonable resasonable transition by the intercepts of
+c(1.7, 1.5, 0.5, 0, -0.8, -1, -1.5)` where
+
+1 --> 2  from "Kein Strafbedürfnis" --> "monatliches Nettogehalt"
+
+2 --> 3  from "monatliches Nettogehalt" --> "2x monatliches Nettogehalt"
+
+3 --> 4  from "2x monatliches Nettogehalt" --> "3x monatliches Nettogehalt"
+
+4 --> 5  from "3x monatliches Nettogehalt" --> "Freiheitsstrafe bis 2 Jahre mit Bewährung"
+
+5 --> 6  from "Freiheitsstrafe bis 2 Jahre mit Bewährung" --> "Freiheitsstrafe bis 2 Jahre ohne Bewährung"
+
+6 --> 7  from "Freiheitsstrafe bis 2 Jahre ohne Bewährung" --> "Freiheitsstrafe 2 - 5 Jahre"
+
+7 --> 8  from "Freiheitsstrafe 2 - 5 Jahre" --> "Freiheitsstrafe über 5 Jahre"
+
+From the data we generate Y as a mixed ordinal outcome with 8 categories and
+model the data with a mixed ordinal model using the `clm` function from the `ordinal` package.
+The linear predictor is given by the formula $Y \sim age + treatment \times setup$.
+TODO: Try without person effect and covariate control
+
+```{r show_data}
+beta = c("age" = 0.05, "educationHS" = -0.1, "educationSC" = -0.05,
+         "educationOC" = 0.03, "gender" = -0.5, "treatmentMany" = 1.5,
+         "setupAlcohol" = -0.5, "setupStealth" = 0.2, "setupCocain" = 2.5,
+         "setupRobbery" = 3, "treatment:setupAlcohol" = -0.4,
+         "treatment:setupStealth" = 0.4, "treatment:setupCocain" = 1.5,
+         "treatment:setupRobbery" = 1)
+intercepts <- c(-1, -3.5, -6, -7, -7.5, -7.75, -8)
+p_eff = seq(-3, 3, length.out = 100)
+sim_data = simulate_mixed_ordinal(100, beta, intercepts, p_eff)
+kableExtra::kable(head(sim_data))
+summary(sim_data)
+```
+
+
+
+```{r simulate, eval = eval}
+power_exp = lapply(possible_pers, function(pers) {
+  p_eff = seq(-3,3, length.out = pers)
+  exp = lapply(1:sims, function(sim) {
+    sim_data = simulate_mixed_ordinal(pers, beta, intercepts, p_eff)
+    model.fit = clm(Y ~ treatment * setup + age + education,
+                    data = sim_data, link = "logit")
+    summary(model.fit)$coefficients  # Extract p-values
+  })
+  message(Sys.time(), paste("          Finished", pers, "persons"))
+  saveRDS(exp, paste0("powerexp_", pers, ".rds"))
+})
+```
+
+```{r read_RDS, include=FALSE}
+power_exp = lapply(possible_pers, function(pers) {
+  readRDS(paste0("powerexp_", pers, ".rds"))
+})
+```
+
+## Power Analysis
+
+Covariate adjusted power analysis by simulation for the ordinal model.
+
+```{r power_analysis, inlcude=FALSE}
+effects = c("treatment", "setupAlcohol", "setupStealth", "setupCocain", "setupRobbery",
+    "treatment:setupAlcohol", "treatment:setupStealth",
+    "treatment:setupCocain", "treatment:setupRobbery")
+power_analysis = lapply(effects, function(covar) {
+    pwr = unlist(lapply(power_exp, function(exp) {
+      p_values = sapply(exp, function(x) x[covar, "Pr(>|z|)"], simplify = "vector")
+      power = mean(sapply(p_values, function(x) x < alpha))
+    }))
+    cbind.data.frame(power = pwr, persons = possible_pers, effect = covar)
+  })
+power_analysis = rbindlist(power_analysis)
+effects[1] = "treatmentMany"
+```
+
+```{r plot_power, warning=FALSE, echo=FALSE}
+ggplot(power_analysis, aes(x = persons, y = power, color = effect)) +
+  geom_smooth(se = FALSE) +
+  geom_hline(yintercept = 0.85, linetype = "dashed") +
+  labs(title = "Power Analysis",
+       x = "Persons",
+       y = "Power",
+       color = "Effect")
+```
+
+Tables with effect, effect size and power for each sample size.
+
+```{r show_power, include=FALSE}
+# in the data table get the row with the power closest to 0.85
+pwer_sample = power_analysis[, .SD[which.min(abs(power - 0.85))], by = effect]
+pwer_sample = cbind(pwer_sample, log_odds = beta[effects])
+pwer_sample = pwer_sample[order(persons, -log_odds)]
+pwer_sample = pwer_sample[, odds := exp(log_odds)]
+```
+
+```{r show_power_table, echo = FALSE}
+kableExtra::kable(pwer_sample)
+```
+
