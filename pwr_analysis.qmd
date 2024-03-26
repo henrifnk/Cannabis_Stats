@@ -1,5 +1,5 @@
 ---
-title: "Power Analysis Canabis"
+title: "Power Analysis Cannabis"
 ---
 
 ## Prerequisites
@@ -10,16 +10,13 @@ library(ordinal)
 library(parallel)
 library(data.table)
 library(ggplot2)
+library(pwrss)
 source("helpers.R")
 eval = FALSE
 set.seed(123L)
 ```
 
-Conduct an analysis to determine the power of the study to detect a significant effect of the `treatment` and `setup` on the outcome.
-The study is a repeated measures design between `n=10` and `n=2500` persons.
-The repeated measures are `rep_measures=10` per person.
-The alpha significance level is set to $\alpha = 0.05$.
-For each sample size, we conduct `sims=100` simulations.
+Conduct an analysis to determine the power of the study to detect a significant effect of the `treatment` and `setup` on the outcome. The study is a repeated measures design between `n=10` and `n=2500` persons. The repeated measures are `rep_measures=10` per person. The alpha significance level is set to $\alpha = 0.05$. For each sample size, we conduct `sims=100` simulations.
 
 ```{r settings}
 possible_pers <- c(10, seq(from=50, to=1e3, by=50), 1250, 1500, 2e3, 2.5e3, 3e3)
@@ -32,37 +29,32 @@ sims <- 200
 
 We simulate the data for each sample size and store the results in a list of matrices.
 
-- $x_{age} \sim Unif(18, 65)$
-- $x_{education} \sim \mathcal{U}\{"High\_School", "Some\_College", "Other\_College"\}$
-- $x_{gender} \sim \mathcal{U}\{"male", "female"\}$
-- $x_{treatment} \sim \mathcal{U}\{0, 1\}$
+-   $x_{age} \sim Unif(18, 65)$
+-   $x_{education} \sim \mathcal{U}\{"High\_School", "Some\_College", "Other\_College"\}$
+-   $x_{gender} \sim \mathcal{U}\{"male", "female"\}$
+-   $x_{treatment} \sim \mathcal{U}\{0, 1\}$
 
 and the mixed effects:
 
 $\gamma_j \sim N(\mu_j, 0.5)$ where the person effect $\mu_j,\ j \in 1, \ldots, 10$ are in the interval $[-3, 3]$.
 
-We conduct power analysis for an alpha level of 0.05, a treatment effect of 0.5 and setup effects compared to "Canabis" of -1, 1.5, 2.5, 3.5.
-We try to reflect a reasonable resasonable transition by the intercepts of
-c(1.7, 1.5, 0.5, 0, -0.8, -1, -1.5)` where
+We conduct power analysis for an alpha level of 0.05, a treatment effect of 0.5 and setup effects compared to "Cannabis" of -1, 1.5, 2.5, 3.5. We try to reflect a reasonable reasonable transition by the intercepts of c(1.7, 1.5, 0.5, 0, -0.8, -1, -1.5)\` where
 
-1 --> 2  from "Kein Strafbedürfnis" --> "monatliches Nettogehalt"
+1 --\> 2 from "Kein Strafbedürfnis" --\> "monatliches Nettogehalt"
 
-2 --> 3  from "monatliches Nettogehalt" --> "2x monatliches Nettogehalt"
+2 --\> 3 from "monatliches Nettogehalt" --\> "2x monatliches Nettogehalt"
 
-3 --> 4  from "2x monatliches Nettogehalt" --> "3x monatliches Nettogehalt"
+3 --\> 4 from "2x monatliches Nettogehalt" --\> "3x monatliches Nettogehalt"
 
-4 --> 5  from "3x monatliches Nettogehalt" --> "Freiheitsstrafe bis 2 Jahre mit Bewährung"
+4 --\> 5 from "3x monatliches Nettogehalt" --\> "Freiheitsstrafe bis 2 Jahre mit Bewährung"
 
-5 --> 6  from "Freiheitsstrafe bis 2 Jahre mit Bewährung" --> "Freiheitsstrafe bis 2 Jahre ohne Bewährung"
+5 --\> 6 from "Freiheitsstrafe bis 2 Jahre mit Bewährung" --\> "Freiheitsstrafe bis 2 Jahre ohne Bewährung"
 
-6 --> 7  from "Freiheitsstrafe bis 2 Jahre ohne Bewährung" --> "Freiheitsstrafe 2 - 5 Jahre"
+6 --\> 7 from "Freiheitsstrafe bis 2 Jahre ohne Bewährung" --\> "Freiheitsstrafe 2 - 5 Jahre"
 
-7 --> 8  from "Freiheitsstrafe 2 - 5 Jahre" --> "Freiheitsstrafe über 5 Jahre"
+7 --\> 8 from "Freiheitsstrafe 2 - 5 Jahre" --\> "Freiheitsstrafe über 5 Jahre"
 
-From the data we generate Y as a mixed ordinal outcome with 8 categories and
-model the data with a mixed ordinal model using the `clm` function from the `ordinal` package.
-The linear predictor is given by the formula $Y \sim age + treatment \times setup$.
-TODO: Try without person effect and covariate control
+From the data we generate Y as a mixed ordinal outcome with 8 categories and model the data with a mixed ordinal model using the `clm` function from the `ordinal` package. The linear predictor is given by the formula $Y \sim age + treatment \times setup$. TODO: Try without person effect and covariate control
 
 ```{r show_data}
 beta = c("age" = 0.05, "educationHS" = -0.1, "educationSC" = -0.05,
@@ -77,8 +69,6 @@ sim_data = simulate_mixed_ordinal(100, beta, intercepts, p_eff)
 kableExtra::kable(head(sim_data))
 summary(sim_data)
 ```
-
-
 
 ```{r simulate, eval = eval}
 power_exp = lapply(possible_pers, function(pers) {
@@ -141,5 +131,39 @@ pwer_sample = pwer_sample[, odds := exp(log_odds)]
 
 ```{r show_power_table, echo = FALSE}
 kableExtra::kable(pwer_sample)
+
 ```
 
+Estimating sample size needed by using the pwrss package and a logistic regression:
+
+```{r pwrss logistic regeression, output = FALSE}
+log_odds <- pwer_sample$log_odds
+p1 <- exp(log_odds)/(1 + exp(log_odds))
+df_probs <- data.frame(effect = pwer_sample$effect, prob = p1)
+p0 <- seq(0.2, 0.8, 0.1)
+
+df_results <- data.frame(effect = numeric(0), p0 = numeric(0), p1 = numeric(0),
+                         sample_size = numeric(0))
+
+for (j in seq(length(p0))) {
+  for (i in seq(length(p1))) {
+    sample_size <- pwrss.z.logreg(p0 = p0[j], p1 = p1[i], alpha = 0.05, power = 0.8,
+                                  r2.other.x = 0.5)$n
+    
+    result_row <- data.frame(effect = pwer_sample$effect[i],
+                             p0 = p0[j],
+                             p1 = p1[i],
+                             sample_size = as.integer(sample_size))
+    
+    df_results <- rbind(df_results, result_row)
+  }
+}
+
+
+```
+
+Sample sizes needed according to pwrss for a power of 0.8.
+
+```{r sample sizes according to pwrss, echo=FALSE}
+kableExtra::kable(df_results)
+```
