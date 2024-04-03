@@ -114,4 +114,4 @@ pwer_sample = pwer_sample[, odds := exp(log_odds)]
 kableExtra::kable(pwer_sample)
 ```
 
-Die Ergebnisse zeigen, dass für alle simulierten Effekte bei einem verwendeten Signifikanzniveau von $\alpha = 0.05$ ab einer Stichprobengröße von 3000 für alle Effekte eine Power größer als 0.8 erreicht werden kann.
+Die Ergebnisse zeigen, dass für alle simulierten Effekte bei einem verwendeten Signifikanzniveau von $\alpha = 0.05$ ab einer Stichprobengröße von 3000 eine Power größer als 0.8 erreicht werden kann.
