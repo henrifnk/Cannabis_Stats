@@ -15,6 +15,8 @@ eval = FALSE
 set.seed(123L)
 ```
 
+# Methoden
+
 ## Power Analyse mit herkömmlichen Methoden
 
 Da die herkömmlichen Methoden mithilfe von Tests üblicher Weise nur für einfachere Modelle existieren, wurde für diese Analyse ein logisitsches Regresionsmodell angenommen. Dabei wird eine binäre Zielvariable angenommen (0/1: keine Strafe/schwere Strafe) und die Wahrscheinlichkeit, Teil von Gruppe 1 zu sein ($P_1$), modeliert. Bei der Base Probability ($P_0$) handelt es sich um die Wahrscheinlichkeit, Teil von Gruppe 1 zu sein, ohne den Einfluss der Kovariablen des Modells. Die Modellgleichung in einem solchen Fall lautet:
@@ -29,7 +31,7 @@ $$
 \beta_0 = ln(\frac{P_0}{1 - P_0})
 $$
 
-Das pwrss Package benutzt den Wald-Test(/z-Test) um die Signifikanz von Variablen zu schätzen und darauf basierend die nötige Stichprobegröße zu finden. Für diese Analyse wurde ein Signifikanzniveau von $\alpha = 0.05$ verwendet, sowie eine Power von 0.08. Die Funktion nutzt neben $P_0$ , $P_1$ (welches sich in diesem Fall um die vorhergesagte Wahrscheinlichkeit, wenn man $X_1$ (bzw. die Kovariable von interesse) von 0 auf 1 erhöht, handelt), $\alpha$ und der Power noch ein Argument für die multiple Korrelation zwischen den Kovariablen in Form von dem korrigierten $R^2$. Für die Zwecke dieser Analyse wurde dieses Argument auf 0.5 gesetzt.
+Das pwrss Package benutzt den Wald-Test(/z-Test) um die Signifikanz von Variablen zu schätzen und darauf basierend die nötige Stichprobegröße zu finden. Für diese Analyse wurde ein Signifikanzniveau von $\alpha = 0.05$ verwendet, sowie eine Power von 0.8. Die Funktion nutzt neben $P_0$ , $P_1$ (welches sich in diesem Fall um die vorhergesagte Wahrscheinlichkeit, wenn man $X_1$ (bzw. die Kovariable von Interesse) von 0 auf 1 erhöht, handelt), $\alpha$ und der Power noch ein Argument für die multiple Korrelation zwischen den Kovariablen in Form von dem korrigierten $R^2$. Für die Zwecke dieser Analyse wurde dieses Argument auf 0.5 gesetzt.
 
 In dieser Analyse wurden verschiedene Kombinationen von $P_0$ und $P_1$ verwendet, um die benötigte Stichprobengröße für verschiedene Datenlagen abzuschätzen. Dabei wurde als minimale Veränderung zwischen den beiden eine Veränderung von 0.03 betrachtet.
 
@@ -55,19 +57,22 @@ for (i in seq(length(p0))) {
     df_results <- rbind(df_results, result_row)
   }
 }
+df_1 <- df_results[1:9,]
+df_2 <- df_results[10:18,]
 ```
 
 ```{r sample sizes according to pwrss, echo=FALSE}
-kableExtra::kable(df_results)
+kableExtra::kable(t(df_1))
+kableExtra::kable(t(df_2))
 ```
 
 Für eine minimale Veränderung von 0.03 zwischen $P_0$ und $P_1$ bewegen sich die benötigten Stichpobengrößen zwischen ca. 1100 und 4400.
 
 ## Power Analyse mit simulierten Daten
 
-Da das angetrebte Modell etwas komplexer ist, als das oben skizzierte Modell, wurde zusätzlich noch eine Power Analyse mithilfe von simultierten Daten durchgeführt. Dabei wurde ein kumulatives Logit-Modell für ordinale Zielvariablen geschätzt. Hierfür wurden die Daten für verschiedene Effektgrößen (zwischen -0.5 und 2.5) und Stichprobengrößen (zwischen 10 Personen und 3000 Personen) simuliert und anschließend ein Modell mit den Daten geschätzt. Zusätzlich zu den Effekten der Kovariablen wurden bei der Simulation der Daten noch Personen-Effekte $\mu_j,\ j \in 1, \ldots, 10$ im Intervall $[-3, 3]$ einbezogen, sowie verschiedene Intercepts.
+Da das angestrebte Modell etwas komplexer ist, als das oben skizzierte Modell, wurde zusätzlich noch eine Power Analyse mithilfe von simultierten Daten durchgeführt. Dabei wurde ein kumulatives Logit-Modell für ordinale Zielvariablen geschätzt. Hierfür wurden die Daten für verschiedene Effektgrößen (zwischen -0.5 und 2.5) und Stichprobengrößen (zwischen 10 Personen und 3000 Personen) simuliert und anschließend ein Modell mit den Daten geschätzt. Zusätzlich zu den Effekten der Kovariablen wurden bei der Simulation der Daten noch Personen-Effekte $\mu_j,\ j \in 1, \ldots, 10$ im Intervall $[-3, 3]$ einbezogen, sowie verschiedene Intercepts.
 
-Das geschätzte Modell benutzt jeweils eine ordinale Variable Y mit 8 Kategorien als Zeilvariable. Der lineare Prädiktor des Modells lautet $Y∼age+treatment×setup$
+Das geschätzte Modell benutzt jeweils eine ordinale Variable Y mit 8 Kategorien als Zielvariable. Der lineare Prädiktor des Modells lautet $Y∼age+treatment×setup$
 
 Die folgende Tabelle zeigt den jeweiligen Effekt, die Effektgröße, die Power und die benöigte Stichprobengröße.
 
@@ -111,7 +116,11 @@ pwer_sample = pwer_sample[, odds := exp(log_odds)]
 ```
 
 ```{r show_power_table, echo = FALSE}
-kableExtra::kable(pwer_sample)
+kableExtra::kable(pwer_sample, digits = 2)
 ```
 
 Die Ergebnisse zeigen, dass für alle simulierten Effekte bei einem verwendeten Signifikanzniveau von $\alpha = 0.05$ ab einer Stichprobengröße von 3000 eine Power größer als 0.8 erreicht werden kann.
+
+# Empfehlung
+
+Nach den Ergebnissen der Power Analyse, empfehlen wir eine Stichprobengröße von 3000-4000 Personen.
