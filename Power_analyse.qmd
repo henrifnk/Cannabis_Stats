@@ -123,4 +123,4 @@ Die Ergebnisse zeigen, dass für alle simulierten Effekte bei einem verwendeten 
 
 # Empfehlung
 
-Nach den Ergebnissen der Power Analyse, empfehlen wir eine Stichprobengröße von 3000-4000 Personen.
+Nach den Ergebnissen der Power Analyse, empfehlen wir eine Stichprobengröße von ca. 3000-4000 Personen.
